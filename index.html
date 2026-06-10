@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>每日复盘</title>
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <!-- 动态渐变背景 -->
+  <div class="bg-gradient"></div>
+  <div class="bg-orbs">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+  </div>
+
+  <div id="app">
+    <!-- 左侧导航栏 -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <h1 class="logo">每日复盘</h1>
+        <p class="subtitle">Daily Review</p>
+      </div>
+
+      <div class="date-nav">
+        <button id="prev-day" class="nav-btn">&lt;</button>
+        <span id="current-date" class="date-display"></span>
+        <button id="next-day" class="nav-btn">&gt;</button>
+      </div>
+      <button id="today-btn" class="today-btn">回到今天</button>
+
+      <nav class="nav-tabs">
+        <button class="nav-tab active" data-tab="checkin">
+          <span class="nav-icon">⭐</span>
+          <span class="nav-label">打卡</span>
+        </button>
+        <button class="nav-tab" data-tab="highlights">
+          <span class="nav-icon">✨</span>
+          <span class="nav-label">亮点改进</span>
+        </button>
+        <button class="nav-tab" data-tab="diary">
+          <span class="nav-icon">📝</span>
+          <span class="nav-label">日记</span>
+        </button>
+        <button class="nav-tab" data-tab="calendar">
+          <span class="nav-icon">📅</span>
+          <span class="nav-label">日历</span>
+        </button>
+        <button class="nav-tab" data-tab="analysis">
+          <span class="nav-icon">🤖</span>
+          <span class="nav-label">AI 分析</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <p>数据保存在本地浏览器</p>
+      </div>
+    </aside>
+
+    <!-- 右侧主内容 -->
+    <main class="main-content">
+      <section id="checkin-section" class="section active"></section>
+      <section id="highlights-section" class="section"></section>
+      <section id="diary-section" class="section"></section>
+      <section id="calendar-section" class="section"></section>
+      <section id="analysis-section" class="section"></section>
+    </main>
+
+    <div id="status-bar" class="status-bar"></div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
