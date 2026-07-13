@@ -186,18 +186,18 @@ export function renderAnalysis(container, dateStr) {
 }
 
 // 生成提示词
-function generatePrompt(type) {
+async function generatePrompt(type) {
   let entries = []
 
   if (type === 'daily') {
-    const data = getEntry(today())
+    const data = await getEntry(today())
     entries = data ? [{ date: today(), ...data }] : []
   } else if (type === 'weekly') {
     const { start, end } = getWeekRange()
-    entries = getRange(start, end)
+    entries = await getRange(start, end)
   } else if (type === 'monthly') {
     const { start, end } = getMonthRange()
-    entries = getRange(start, end)
+    entries = await getRange(start, end)
   }
 
   if (entries.length === 0) {

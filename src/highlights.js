@@ -59,8 +59,8 @@ function renderList(type, dateStr) {
   })
 }
 
-function loadHighlights(dateStr) {
-  const entry = getEntry(dateStr)
+async function loadHighlights(dateStr) {
+  const entry = await getEntry(dateStr)
   const data = entry ? entry.highlights : null
   if (data) {
     currentData = { wins: data.wins || [], improves: data.improves || [] }

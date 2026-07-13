@@ -5,6 +5,8 @@ import { renderDiary } from './diary.js'
 import { renderCalendar } from './calendar.js'
 import { renderAnalysis } from './analysis.js'
 import { formatDate, displayDate, parseDate } from './utils.js'
+import { initAuth, onAuthChange, signInWithGitHub, signOut, getCurrentUser } from './auth.js'
+import { syncOnLogin } from './store.js'
 
 let currentDate = new Date()
 let activeTab = 'checkin'
@@ -17,7 +19,7 @@ function updateDateDisplay() {
   document.getElementById('current-date').textContent = displayDate(currentDate)
 }
 
-function renderCurrentTab() {
+async function renderCurrentTab() {
   const dateStr = getCurrentDateStr()
 
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'))
@@ -34,7 +36,7 @@ function renderCurrentTab() {
       renderDiary(document.getElementById('diary-section'), dateStr)
       break
     case 'calendar':
-      renderCalendar(document.getElementById('calendar-section'), dateStr, (newDateStr) => {
+      await renderCalendar(document.getElementById('calendar-section'), dateStr, (newDateStr) => {
         currentDate = parseDate(newDateStr)
         updateDateDisplay()
         switchTab('checkin')
@@ -54,7 +56,50 @@ function switchTab(tab) {
   renderCurrentTab()
 }
 
-function init() {
+function updateAuthUI(user) {
+  const authArea = document.getElementById('auth-area')
+  if (user) {
+    const avatar = user.user_metadata?.avatar_url || ''
+    const name = user.user_metadata?.user_name || user.email || '用户'
+    authArea.innerHTML = `
+      <div class="user-info">
+        ${avatar ? `<img class="user-avatar" src="${avatar}" alt="" />` : ''}
+        <span class="user-name">${name}</span>
+      </div>
+      <button id="logout-btn" class="auth-btn logout">退出登录</button>
+    `
+    document.getElementById('logout-btn').addEventListener('click', async () => {
+      await signOut()
+    })
+  } else {
+    authArea.innerHTML = `
+      <button id="login-btn" class="auth-btn login">GitHub 登录</button>
+    `
+    document.getElementById('login-btn').addEventListener('click', () => {
+      signInWithGitHub()
+    })
+  }
+}
+
+async function init() {
+  // 初始化认证
+  const user = await initAuth()
+  updateAuthUI(user)
+
+  // 监听登录状态变化
+  onAuthChange(async (newUser) => {
+    updateAuthUI(newUser)
+    if (newUser) {
+      await syncOnLogin()
+      renderCurrentTab()
+    }
+  })
+
+  // 已登录则同步数据
+  if (user) {
+    await syncOnLogin()
+  }
+
   updateDateDisplay()
 
   document.querySelectorAll('.nav-tab').forEach(tab => {

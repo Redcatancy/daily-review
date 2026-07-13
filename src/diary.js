@@ -38,8 +38,8 @@ export function renderDiary(container, dateStr) {
   loadDiary(dateStr)
 }
 
-function loadDiary(dateStr) {
-  const entry = getEntry(dateStr)
+async function loadDiary(dateStr) {
+  const entry = await getEntry(dateStr)
   const data = entry ? entry.diary : null
   const titleInput = document.getElementById('diary-title')
   const contentInput = document.getElementById('diary-content')
