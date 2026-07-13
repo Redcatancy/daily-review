@@ -2,7 +2,7 @@
 import { getEntry, saveEntry } from './store.js'
 import { getCurrentUser } from './auth.js'
 import { createCapturedDebounce, createRenderGuard } from './editor-state.js'
-import { showStatus, parseDate } from './utils.js'
+import { showSaveResult, parseDate } from './utils.js'
 
 const renderGuard = createRenderGuard()
 let pendingDiary = null
@@ -71,6 +71,5 @@ async function saveCapturedDiary({ date, title, content }) {
     ? { title: title.trim(), content: content.trim() }
     : null
   const result = await saveEntry(date, { diary })
-  showStatus(result.kind === 'local-failure' ? '日记保存失败' : '日记已自动保存')
-  return result
+  return showSaveResult(result)
 }

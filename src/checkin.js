@@ -2,7 +2,7 @@
 import { getEntry, saveEntry } from './store.js'
 import { getCurrentUser } from './auth.js'
 import { createRenderGuard } from './editor-state.js'
-import { showStatus } from './utils.js'
+import { showSaveResult } from './utils.js'
 
 const DIMENSIONS = [
   { key: 'health', label: '健康运动', icon: '🏃' },
@@ -89,5 +89,5 @@ async function loadCheckin(container, state, token) {
 
 async function saveCheckin(dateStr, data) {
   const result = await saveEntry(dateStr, { checkin: structuredClone(data) })
-  showStatus(result.kind === 'local-failure' ? '打卡保存失败' : '打卡已保存')
+  showSaveResult(result)
 }

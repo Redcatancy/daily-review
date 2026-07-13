@@ -2,7 +2,7 @@
 import { getEntry, saveEntry } from './store.js'
 import { getCurrentUser } from './auth.js'
 import { createRenderGuard } from './editor-state.js'
-import { showStatus } from './utils.js'
+import { showSaveResult } from './utils.js'
 
 const renderGuard = createRenderGuard()
 
@@ -32,8 +32,7 @@ export function renderHighlights(container, dateStr) {
   function saveHighlights() {
     return saveEntry(dateStr, { highlights: structuredClone(state.data) })
       .then(result => {
-        showStatus(result.kind === 'local-failure' ? '保存失败' : '已保存')
-        return result
+        return showSaveResult(result)
       })
   }
 
