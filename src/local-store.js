@@ -9,6 +9,24 @@ const outboxKey = userId => `daily-review:user:${userId}:outbox`
 const conflictsKey = userId => `daily-review:user:${userId}:conflicts`
 const migrationKey = userId => `daily-review:user:${userId}:migration`
 
+function canonical(value) {
+  if (Array.isArray(value)) return value.map(canonical)
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.keys(value).sort().map(key => [key, canonical(value[key])])
+    )
+  }
+  return value
+}
+
+function equalValue(left, right) {
+  return JSON.stringify(canonical(left)) === JSON.stringify(canonical(right))
+}
+
+function hasValue(value) {
+  return value !== undefined && value !== null
+}
+
 export function createLocalStore(storage, { now = () => new Date().toISOString() } = {}) {
   function readJson(key, fallback) {
     const raw = storage.getItem(key)
@@ -101,6 +119,71 @@ export function createLocalStore(storage, { now = () => new Date().toISOString()
     return marked.kind === 'ok' ? { kind: 'migrated' } : marked
   }
 
+  function mergeRemote(userId, remoteEntries) {
+    const entries = readEntries(userId)
+    const outbox = readOutbox(userId)
+    const conflicts = readJson(conflictsKey(userId), [])
+    const newConflicts = []
+
+    for (const [date, remoteEntry] of Object.entries(remoteEntries)) {
+      entries[date] ||= {}
+      for (const field of FIELDS) {
+        const localValue = entries[date][field]
+        const remoteValue = remoteEntry[field]
+        const pendingField = Object.hasOwn(outbox[date] || {}, field)
+        const localPresent = hasValue(localValue) || pendingField
+
+        if (!hasValue(remoteValue)) continue
+        if (!localPresent) {
+          entries[date][field] = structuredClone(remoteValue)
+          continue
+        }
+        if (equalValue(localValue, remoteValue)) continue
+
+        const conflict = {
+          date,
+          field,
+          local: structuredClone(localValue),
+          remote: structuredClone(remoteValue),
+          detectedAt: now()
+        }
+        const alreadyArchived = conflicts.some(item =>
+          item.date === date &&
+          item.field === field &&
+          equalValue(item.local, conflict.local) &&
+          equalValue(item.remote, conflict.remote)
+        )
+        if (!alreadyArchived) {
+          conflicts.push(conflict)
+          newConflicts.push(conflict)
+        }
+
+        entries[date][field] = structuredClone(remoteValue)
+        if (outbox[date]) delete outbox[date][field]
+      }
+    }
+
+    for (const date of Object.keys(outbox)) {
+      if (Object.keys(outbox[date]).length === 0) delete outbox[date]
+    }
+
+    const conflictWrite = verifiedWrite(conflictsKey(userId), conflicts)
+    if (conflictWrite.kind !== 'ok') return conflictWrite
+    const entriesWrite = verifiedWrite(entriesKey(userId), entries)
+    if (entriesWrite.kind !== 'ok') return entriesWrite
+    const outboxWrite = verifiedWrite(outboxKey(userId), outbox)
+    if (outboxWrite.kind !== 'ok') return outboxWrite
+    return { kind: 'merged', conflicts: newConflicts }
+  }
+
+  function ackOutbox(userId, date, fields) {
+    const outbox = readOutbox(userId)
+    if (!outbox[date]) return { kind: 'ok' }
+    for (const field of fields) delete outbox[date][field]
+    if (Object.keys(outbox[date]).length === 0) delete outbox[date]
+    return verifiedWrite(outboxKey(userId), outbox)
+  }
+
   function exportBundle(userId) {
     return {
       version: 1,
@@ -119,6 +202,8 @@ export function createLocalStore(storage, { now = () => new Date().toISOString()
     readOutbox,
     saveFields,
     migrateLegacy,
+    mergeRemote,
+    ackOutbox,
     exportBundle,
     verifiedWrite
   }
