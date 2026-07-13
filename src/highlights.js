@@ -1,10 +1,21 @@
 // 每日亮点 / 改进模块
 import { getEntry, saveEntry } from './store.js'
+import { getCurrentUser } from './auth.js'
+import { createRenderGuard } from './editor-state.js'
 import { showStatus } from './utils.js'
 
-let currentData = { wins: [], improves: [] }
+const renderGuard = createRenderGuard()
 
 export function renderHighlights(container, dateStr) {
+  const state = {
+    data: { wins: [], improves: [] },
+    edited: false
+  }
+  const token = renderGuard.begin({
+    userId: getCurrentUser()?.id ?? null,
+    date: dateStr
+  })
+
   container.innerHTML = `
     <div class="highlights-group">
       <h3 class="highlights-title">✨ 今日亮点</h3>
@@ -18,60 +29,66 @@ export function renderHighlights(container, dateStr) {
     </div>
   `
 
-  document.getElementById('add-win').addEventListener('click', () => addEntry('wins', dateStr))
-  document.getElementById('add-improve').addEventListener('click', () => addEntry('improves', dateStr))
-  loadHighlights(dateStr)
-}
-
-function addEntry(type, dateStr) {
-  currentData[type].push('')
-  renderList(type, dateStr)
-  const inputs = document.querySelectorAll(`#${type}-list .highlight-input`)
-  if (inputs.length > 0) inputs[inputs.length - 1].focus()
-}
-
-function removeEntry(type, index, dateStr) {
-  currentData[type].splice(index, 1)
-  renderList(type, dateStr)
-  saveHighlights(dateStr)
-}
-
-function renderList(type, dateStr) {
-  const listEl = document.getElementById(`${type}-list`)
-  listEl.innerHTML = ''
-
-  currentData[type].forEach((text, i) => {
-    const item = document.createElement('div')
-    item.className = 'highlight-item'
-    item.innerHTML = `
-      <input class="highlight-input" value="${text.replace(/"/g, '&quot;')}"
-             placeholder="${type === 'wins' ? '做得好的事...' : '可以改进的事...'}" />
-      <button class="btn-delete">&times;</button>
-    `
-    item.querySelector('.highlight-input').addEventListener('change', (e) => {
-      currentData[type][i] = e.target.value
-      saveHighlights(dateStr)
-    })
-    item.querySelector('.btn-delete').addEventListener('click', () => {
-      removeEntry(type, i, dateStr)
-    })
-    listEl.appendChild(item)
-  })
-}
-
-async function loadHighlights(dateStr) {
-  const entry = await getEntry(dateStr)
-  const data = entry ? entry.highlights : null
-  if (data) {
-    currentData = { wins: data.wins || [], improves: data.improves || [] }
-  } else {
-    currentData = { wins: [], improves: [] }
+  function saveHighlights() {
+    return saveEntry(dateStr, { highlights: structuredClone(state.data) })
+      .then(result => {
+        showStatus(result.kind === 'local-failure' ? '保存失败' : '已保存')
+        return result
+      })
   }
-  renderList('wins', dateStr)
-  renderList('improves', dateStr)
-}
 
-function saveHighlights(dateStr) {
-  saveEntry(dateStr, { highlights: currentData })
-  showStatus('已保存')
+  function renderList(type) {
+    const list = container.querySelector(`#${type}-list`)
+    if (!list) return
+    list.innerHTML = ''
+
+    state.data[type].forEach((text, index) => {
+      const item = document.createElement('div')
+      item.className = 'highlight-item'
+
+      const input = document.createElement('input')
+      input.className = 'highlight-input'
+      input.value = text
+      input.placeholder = type === 'wins' ? '做得好的事...' : '可以改进的事...'
+      input.addEventListener('change', event => {
+        state.edited = true
+        state.data[type][index] = event.target.value
+        void saveHighlights()
+      })
+
+      const removeButton = document.createElement('button')
+      removeButton.className = 'btn-delete'
+      removeButton.innerHTML = '&times;'
+      removeButton.addEventListener('click', () => {
+        state.edited = true
+        state.data[type].splice(index, 1)
+        renderList(type)
+        void saveHighlights()
+      })
+
+      item.append(input, removeButton)
+      list.appendChild(item)
+    })
+  }
+
+  function addEntry(type) {
+    state.edited = true
+    state.data[type].push('')
+    renderList(type)
+    const inputs = container.querySelectorAll(`#${type}-list .highlight-input`)
+    inputs[inputs.length - 1]?.focus()
+  }
+
+  container.querySelector('#add-win').addEventListener('click', () => addEntry('wins'))
+  container.querySelector('#add-improve').addEventListener('click', () => addEntry('improves'))
+
+  void getEntry(dateStr).then(entry => {
+    if (!renderGuard.isCurrent(token) || !container.isConnected || state.edited) return
+    const data = entry?.highlights
+    state.data = data
+      ? { wins: [...(data.wins || [])], improves: [...(data.improves || [])] }
+      : { wins: [], improves: [] }
+    renderList('wins')
+    renderList('improves')
+  })
 }

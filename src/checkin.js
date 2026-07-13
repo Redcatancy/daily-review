@@ -1,5 +1,7 @@
 // 打卡模块 — 4 个维度的星级评分 + 备注
 import { getEntry, saveEntry } from './store.js'
+import { getCurrentUser } from './auth.js'
+import { createRenderGuard } from './editor-state.js'
 import { showStatus } from './utils.js'
 
 const DIMENSIONS = [
@@ -9,9 +11,14 @@ const DIMENSIONS = [
   { key: 'mood', label: '情绪状态', icon: '😊' }
 ]
 
-let currentData = {}
+const renderGuard = createRenderGuard()
 
 export function renderCheckin(container, dateStr) {
+  const state = { data: {}, edited: false }
+  const token = renderGuard.begin({
+    userId: getCurrentUser()?.id ?? null,
+    date: dateStr
+  })
   container.innerHTML = ''
 
   DIMENSIONS.forEach(dim => {
@@ -34,64 +41,53 @@ export function renderCheckin(container, dateStr) {
   })
 
   container.querySelectorAll('.stars').forEach(starsEl => {
-    starsEl.addEventListener('click', (e) => {
-      const btn = e.target.closest('.star')
-      if (!btn) return
-      const dim = starsEl.dataset.dim
-      const value = Number(btn.dataset.value)
-      currentData[dim] = value
+    starsEl.addEventListener('click', event => {
+      const button = event.target.closest('.star')
+      if (!button) return
+      const dimension = starsEl.dataset.dim
+      const value = Number(button.dataset.value)
+      state.edited = true
+      state.data[dimension] = value
       updateStarsUI(starsEl, value)
-      saveCheckin(dateStr)
+      void saveCheckin(dateStr, state.data)
     })
   })
 
   container.querySelectorAll('.checkin-note').forEach(input => {
     input.addEventListener('change', () => {
-      const dim = input.dataset.dim
-      if (!currentData.notes) currentData.notes = {}
-      currentData.notes[dim] = input.value
-      saveCheckin(dateStr)
+      const dimension = input.dataset.dim
+      state.edited = true
+      state.data.notes ||= {}
+      state.data.notes[dimension] = input.value
+      void saveCheckin(dateStr, state.data)
     })
   })
 
-  loadCheckin(dateStr)
+  void loadCheckin(container, state, token)
 }
 
 function updateStarsUI(starsEl, value) {
-  starsEl.querySelectorAll('.star').forEach(btn => {
-    btn.classList.toggle('active', Number(btn.dataset.value) <= value)
+  starsEl.querySelectorAll('.star').forEach(button => {
+    button.classList.toggle('active', Number(button.dataset.value) <= value)
   })
 }
 
-async function loadCheckin(dateStr) {
-  const entry = await getEntry(dateStr)
-  const data = entry ? entry.checkin : null
-  if (data) {
-    currentData = data
-    DIMENSIONS.forEach(dim => {
-      const starsEl = document.querySelector(`.stars[data-dim="${dim.key}"]`)
-      if (starsEl && currentData[dim.key]) {
-        updateStarsUI(starsEl, currentData[dim.key])
-      }
-      const noteInput = document.querySelector(`.checkin-note[data-dim="${dim.key}"]`)
-      if (noteInput && currentData.notes && currentData.notes[dim.key]) {
-        noteInput.value = currentData.notes[dim.key]
-      }
-    })
-  } else {
-    currentData = {}
-    resetUI()
-  }
-}
+async function loadCheckin(container, state, token) {
+  const entry = await getEntry(token.date)
+  if (!renderGuard.isCurrent(token) || !container.isConnected || state.edited) return
 
-function resetUI() {
-  document.querySelectorAll('.stars').forEach(el => {
-    el.querySelectorAll('.star').forEach(btn => btn.classList.remove('active'))
+  state.data = structuredClone(entry?.checkin || {})
+  DIMENSIONS.forEach(dimension => {
+    const starsEl = container.querySelector(`.stars[data-dim="${dimension.key}"]`)
+    if (starsEl && state.data[dimension.key]) {
+      updateStarsUI(starsEl, state.data[dimension.key])
+    }
+    const noteInput = container.querySelector(`.checkin-note[data-dim="${dimension.key}"]`)
+    if (noteInput) noteInput.value = state.data.notes?.[dimension.key] || ''
   })
-  document.querySelectorAll('.checkin-note').forEach(input => { input.value = '' })
 }
 
-function saveCheckin(dateStr) {
-  saveEntry(dateStr, { checkin: currentData })
-  showStatus('打卡已保存')
+async function saveCheckin(dateStr, data) {
+  const result = await saveEntry(dateStr, { checkin: structuredClone(data) })
+  showStatus(result.kind === 'local-failure' ? '打卡保存失败' : '打卡已保存')
 }
