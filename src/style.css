@@ -274,6 +274,70 @@ body {
   text-align: center;
 }
 
+/* 登录区域 */
+#auth-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  justify-content: center;
+}
+
+.user-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.user-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.auth-btn {
+  width: 100%;
+  padding: 10px 16px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1px solid;
+}
+
+.auth-btn.login {
+  background: rgba(0, 0, 0, 0.06);
+  border-color: rgba(0, 0, 0, 0.1);
+  color: var(--text);
+}
+
+.auth-btn.login:hover {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.auth-btn.logout {
+  background: transparent;
+  border-color: rgba(0, 0, 0, 0.08);
+  color: var(--text-muted);
+  font-size: 12px;
+  padding: 6px 12px;
+}
+
+.auth-btn.logout:hover {
+  color: var(--red);
+  border-color: rgba(225, 112, 85, 0.3);
+}
+
 /* ===== 右侧主内容 ===== */
 .main-content {
   flex: 1;

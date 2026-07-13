@@ -63,8 +63,8 @@ function updateStarsUI(starsEl, value) {
   })
 }
 
-function loadCheckin(dateStr) {
-  const entry = getEntry(dateStr)
+async function loadCheckin(dateStr) {
+  const entry = await getEntry(dateStr)
   const data = entry ? entry.checkin : null
   if (data) {
     currentData = data
