@@ -1,5 +1,6 @@
 const LEGACY_KEY = 'daily-review'
 const LEGACY_BACKUP_KEY = 'daily-review:legacy-backup:v1'
+const LEGACY_CLAIM_KEY = 'daily-review:legacy-claim:v1'
 const FIELDS = ['checkin', 'highlights', 'diary']
 
 const entriesKey = userId => userId
@@ -77,6 +78,11 @@ export function createLocalStore(storage, { now = () => new Date().toISOString()
     if (!userId) return { kind: 'skipped' }
     if (readJson(migrationKey(userId), null)?.complete) return { kind: 'already-migrated' }
 
+    const existingClaim = readJson(LEGACY_CLAIM_KEY, null)
+    if (existingClaim?.userId && existingClaim.userId !== userId) {
+      return { kind: 'claimed-by-other-user' }
+    }
+
     const raw = storage.getItem(LEGACY_KEY)
     if (raw === null) {
       const marked = verifiedWrite(migrationKey(userId), {
@@ -90,6 +96,11 @@ export function createLocalStore(storage, { now = () => new Date().toISOString()
     if (storage.getItem(LEGACY_BACKUP_KEY) === null) {
       const backup = verifiedWrite(LEGACY_BACKUP_KEY, { raw, createdAt: now() })
       if (backup.kind !== 'ok') return backup
+    }
+
+    if (!existingClaim) {
+      const claimed = verifiedWrite(LEGACY_CLAIM_KEY, { userId, claimedAt: now() })
+      if (claimed.kind !== 'ok') return claimed
     }
 
     let legacy
@@ -193,7 +204,8 @@ export function createLocalStore(storage, { now = () => new Date().toISOString()
       outbox: readOutbox(userId),
       conflicts: userId ? readJson(conflictsKey(userId), []) : [],
       migration: userId ? readJson(migrationKey(userId), null) : null,
-      legacyBackup: readJson(LEGACY_BACKUP_KEY, null)
+      legacyBackup: readJson(LEGACY_BACKUP_KEY, null),
+      legacyClaim: readJson(LEGACY_CLAIM_KEY, null)
     }
   }
 

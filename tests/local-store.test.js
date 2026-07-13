@@ -27,6 +27,18 @@ test('migration is idempotent and never duplicates outbox or conflicts', () => {
   assert.equal(JSON.stringify(local.exportBundle('user-redcatancy')), first)
 })
 
+test('claims the legacy source for only the first confirmed account', () => {
+  const storage = new MemoryStorage({ 'daily-review': legacy })
+  const local = createLocalStore(storage)
+  local.migrateLegacy('user-redcatancy')
+
+  const second = local.migrateLegacy('another-user')
+
+  assert.equal(second.kind, 'claimed-by-other-user')
+  assert.deepEqual(local.readEntries('another-user'), {})
+  assert.equal(storage.getItem('daily-review'), legacy)
+})
+
 test('keeps guest and authenticated records in different keys', () => {
   const local = createLocalStore(new MemoryStorage())
   local.saveFields(null, '2026-07-13', { diary: { title: '访客' } })
