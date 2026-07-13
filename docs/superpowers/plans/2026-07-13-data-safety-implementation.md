@@ -26,6 +26,8 @@
 
 ## Task 1: Establish the test harness and verified user-scoped storage
 
+**Execution correction:** Before Task 3, add `daily-review:legacy-claim:v1` and a failing regression test proving the first confirmed account is the only account allowed to claim the legacy source. Export that claim with the recovery bundle. This closes the cross-account legacy-copy gap found during plan execution.
+
 **Files:**
 - Modify: `package.json:6-10`
 - Create: `tests/memory-storage.js`
