@@ -5,6 +5,7 @@ import { renderDiary, flushPendingDiarySave } from './diary.js'
 import { renderCalendar } from './calendar.js'
 import { renderAnalysis } from './analysis.js'
 import { formatDate, displayDate, parseDate, showStatus } from './utils.js'
+import { icon } from './icons.js'
 import { initAuth, onAuthChange, signInWithGitHub, signOut } from './auth.js'
 import {
   exportCurrentBackup,
@@ -149,7 +150,14 @@ function reportSyncResult(result) {
   }
 }
 
+function hydrateStaticIcons() {
+  document.querySelectorAll('[data-icon]').forEach(mount => {
+    mount.innerHTML = icon(mount.dataset.icon, 'ui-icon ui-icon-nav')
+  })
+}
+
 async function init() {
+  hydrateStaticIcons()
   const user = await initAuth()
   setActiveUser(user)
   updateAuthUI(user)

@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
 import { icon } from '../src/icons.js'
 
 test('renders the shared decorative SVG contract', () => {
@@ -36,4 +37,23 @@ test('rejects unknown icons and unsafe class names', () => {
     () => icon('sparkles', 'ui-icon" onclick="alert(1)'),
     /Invalid icon class name/
   )
+})
+
+test('functional UI sources use the shared icon system instead of approved Emoji', async () => {
+  const files = ['index.html', 'src/checkin.js', 'src/highlights.js', 'src/analysis.js', 'src/quote.js']
+  const sources = await Promise.all(files.map(file => readFile(new URL(`../${file}`, import.meta.url), 'utf8')))
+  const source = sources.join('\n')
+
+  for (const emoji of ['⭐', '✨', '📝', '📅', '🤖', '🏃', '📚', '💼', '😊', '💡', '📊', '📈', '🗓️', '💬']) {
+    assert.equal(source.includes(emoji), false, `functional Emoji remains: ${emoji}`)
+  }
+  assert.match(sources[0], /data-icon="check-circle"/)
+  assert.match(sources[1], /icon\(dim\.icon, 'ui-icon ui-icon-dimension'\)/)
+})
+
+test('desktop contrast tokens match the approved palette', async () => {
+  const css = await readFile(new URL('../src/style.css', import.meta.url), 'utf8')
+  assert.match(css, /--text-secondary:\s*#514B57;/)
+  assert.match(css, /--text-muted:\s*#6F6875;/)
+  assert.match(css, /--accent:\s*#6C5CE7;/)
 })

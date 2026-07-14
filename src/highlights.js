@@ -3,6 +3,7 @@ import { getEntry, saveEntry } from './store.js'
 import { getCurrentUser } from './auth.js'
 import { createRenderGuard } from './editor-state.js'
 import { showSaveResult } from './utils.js'
+import { icon } from './icons.js'
 
 const renderGuard = createRenderGuard()
 
@@ -18,12 +19,12 @@ export function renderHighlights(container, dateStr) {
 
   container.innerHTML = `
     <div class="highlights-group">
-      <h3 class="highlights-title">✨ 今日亮点</h3>
+      <h3 class="highlights-title">${icon('sparkles', 'ui-icon ui-icon-section')}<span>今日亮点</span></h3>
       <div id="wins-list" class="highlights-list"></div>
       <button id="add-win" class="btn-add">+ 添加亮点</button>
     </div>
     <div class="highlights-group">
-      <h3 class="highlights-title">💡 明日改进</h3>
+      <h3 class="highlights-title">${icon('lightbulb', 'ui-icon ui-icon-section')}<span>明日改进</span></h3>
       <div id="improves-list" class="highlights-list"></div>
       <button id="add-improve" class="btn-add">+ 添加改进</button>
     </div>

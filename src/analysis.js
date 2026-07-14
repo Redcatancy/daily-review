@@ -1,6 +1,7 @@
 // AI 分析模块 — 生成提示词供用户复制到 AI 工具分析
 import { getRange, getEntry } from './store.js'
 import { formatDate, showStatus } from './utils.js'
+import { icon } from './icons.js'
 
 const DIM_LABELS = { health: '健康运动', learning: '学习成长', work: '工作产出', mood: '情绪状态' }
 
@@ -128,19 +129,19 @@ export function renderAnalysis(container, dateStr) {
     <div class="analysis-section">
       <div class="analysis-cards">
         <div class="analysis-card" data-type="daily">
-          <div class="analysis-card-icon">📊</div>
+          <div class="analysis-card-icon">${icon('chart-bar', 'ui-icon ui-icon-analysis')}</div>
           <div class="analysis-card-title">今日分析</div>
           <div class="analysis-card-desc">分析今天的复盘数据，给出明日行动建议</div>
           <button class="analysis-btn">生成提示词</button>
         </div>
         <div class="analysis-card" data-type="weekly">
-          <div class="analysis-card-icon">📈</div>
+          <div class="analysis-card-icon">${icon('trending-up', 'ui-icon ui-icon-analysis')}</div>
           <div class="analysis-card-title">本周总结</div>
           <div class="analysis-card-desc">回顾本周复盘，发现规律，制定下周计划</div>
           <button class="analysis-btn">生成提示词</button>
         </div>
         <div class="analysis-card" data-type="monthly">
-          <div class="analysis-card-icon">🗓️</div>
+          <div class="analysis-card-icon">${icon('calendar-range', 'ui-icon ui-icon-analysis')}</div>
           <div class="analysis-card-title">月度回顾</div>
           <div class="analysis-card-desc">深度分析本月成长，制定下月目标</div>
           <button class="analysis-btn">生成提示词</button>

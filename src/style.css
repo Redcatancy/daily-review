@@ -21,8 +21,8 @@
   --green: #00B894;
   --red: #E17055;
   --text: #2D2D2D;
-  --text-secondary: #5A5A5A;
-  --text-muted: #9A9A9A;
+  --text-secondary: #514B57;
+  --text-muted: #6F6875;
   --bg: #F5F0EA;
   --radius: 20px;
   --radius-sm: 14px;
@@ -37,6 +37,36 @@ body {
   min-height: 100vh;
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
+}
+
+.ui-icon {
+  display: block;
+  flex: 0 0 auto;
+  pointer-events: none;
+}
+
+.ui-icon-nav {
+  width: 20px;
+  height: 20px;
+}
+
+.ui-icon-section,
+.ui-icon-dimension {
+  width: 22px;
+  height: 22px;
+}
+
+.ui-icon-analysis {
+  width: 34px;
+  height: 34px;
+}
+
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid rgba(108, 92, 231, 0.72);
+  outline-offset: 3px;
 }
 
 /* ===== 暖色渐变背景 ===== */
@@ -251,16 +281,17 @@ body {
 
 .nav-tab.active {
   background: rgba(255, 255, 255, 0.7);
-  color: var(--text);
+  color: var(--accent);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.9),
     0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
 .nav-icon {
-  font-size: 18px;
   width: 24px;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .sidebar-footer {
@@ -404,7 +435,9 @@ body {
 }
 
 .checkin-icon {
-  font-size: 24px;
+  display: flex;
+  align-items: center;
+  color: var(--accent);
 }
 
 .checkin-label {
@@ -480,6 +513,9 @@ body {
 }
 
 .highlights-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   font-size: 18px;
   font-weight: 600;
   margin-bottom: 16px;
@@ -588,7 +624,9 @@ body {
 }
 
 .quote-icon {
-  font-size: 20px;
+  display: flex;
+  align-items: center;
+  color: var(--accent);
   flex-shrink: 0;
   margin-top: 2px;
 }
@@ -1025,7 +1063,10 @@ body {
 }
 
 .analysis-card-icon {
-  font-size: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
   margin-bottom: 4px;
 }
 

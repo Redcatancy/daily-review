@@ -3,12 +3,13 @@ import { getEntry, saveEntry } from './store.js'
 import { getCurrentUser } from './auth.js'
 import { createRenderGuard } from './editor-state.js'
 import { showSaveResult } from './utils.js'
+import { icon } from './icons.js'
 
 const DIMENSIONS = [
-  { key: 'health', label: '健康运动', icon: '🏃' },
-  { key: 'learning', label: '学习成长', icon: '📚' },
-  { key: 'work', label: '工作产出', icon: '💼' },
-  { key: 'mood', label: '情绪状态', icon: '😊' }
+  { key: 'health', label: '健康运动', icon: 'activity' },
+  { key: 'learning', label: '学习成长', icon: 'book-open' },
+  { key: 'work', label: '工作产出', icon: 'briefcase' },
+  { key: 'mood', label: '情绪状态', icon: 'smile' }
 ]
 
 const renderGuard = createRenderGuard()
@@ -26,7 +27,7 @@ export function renderCheckin(container, dateStr) {
     card.className = 'checkin-card'
     card.innerHTML = `
       <div class="checkin-header">
-        <span class="checkin-icon">${dim.icon}</span>
+        <span class="checkin-icon">${icon(dim.icon, 'ui-icon ui-icon-dimension')}</span>
         <span class="checkin-label">${dim.label}</span>
       </div>
       <div class="stars" data-dim="${dim.key}">
