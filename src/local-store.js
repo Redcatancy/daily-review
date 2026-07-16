@@ -151,10 +151,17 @@ export function createLocalStore(storage, { now = () => new Date().toISOString()
         }
         if (equalValue(localValue, remoteValue)) continue
 
+        if (!pendingField) {
+          entries[date][field] = structuredClone(remoteValue)
+          continue
+        }
+
+        const pendingValue = outbox[date][field]
+
         const conflict = {
           date,
           field,
-          local: structuredClone(localValue),
+          local: structuredClone(pendingValue),
           remote: structuredClone(remoteValue),
           detectedAt: now()
         }
@@ -169,8 +176,7 @@ export function createLocalStore(storage, { now = () => new Date().toISOString()
           newConflicts.push(conflict)
         }
 
-        entries[date][field] = structuredClone(remoteValue)
-        if (outbox[date]) delete outbox[date][field]
+        entries[date][field] = structuredClone(pendingValue)
       }
     }
 

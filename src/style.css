@@ -62,8 +62,6 @@ body {
 }
 
 button:focus-visible,
-input:focus-visible,
-textarea:focus-visible,
 [tabindex]:focus-visible {
   outline: 2px solid rgba(108, 92, 231, 0.72);
   outline-offset: 3px;

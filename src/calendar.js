@@ -7,6 +7,10 @@ function escapeHtml(str) {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
+export function getCalendarPreviewText(entry) {
+  return entry?.diary?.title?.trim() || ''
+}
+
 async function buildPreview(dateStr) {
   const entry = await getEntry(dateStr)
   if (!entry) return { moodColor: '', previewText: '' }
@@ -24,17 +28,7 @@ async function buildPreview(dateStr) {
     }
   }
 
-  let previewText = ''
-  if (entry.diary && entry.diary.title) {
-    previewText = entry.diary.title
-  } else if (entry.highlights) {
-    const win = (entry.highlights.wins || []).find(w => w.trim())
-    if (win) previewText = win
-    else {
-      const imp = (entry.highlights.improves || []).find(w => w.trim())
-      if (imp) previewText = imp
-    }
-  }
+  const previewText = getCalendarPreviewText(entry)
 
   return { moodColor, previewText }
 }

@@ -58,30 +58,44 @@ test('reports a local failure without changing the previous value', () => {
   assert.equal(local.readEntries(null)['2026-07-13'].diary.title, '安全值')
 })
 
-test('merges remote-only fields and archives both sides of a conflict', () => {
+test('keeps a pending local field visible and queued when the cloud is stale', () => {
   const local = createLocalStore(new MemoryStorage(), {
     now: () => '2026-07-13T00:00:00.000Z'
   })
   local.saveFields('u1', '2026-07-12', {
-    diary: { title: '本地版本' },
-    highlights: { wins: ['本地独有'], improves: [] }
+    diary: { title: 'local-new' }
   })
 
   const result = local.mergeRemote('u1', {
     '2026-07-12': {
-      diary: { title: '云端版本' },
+      diary: { title: 'cloud-old' },
       checkin: { mood: 5 }
     }
   })
 
   const visible = local.readEntries('u1')['2026-07-12']
-  assert.deepEqual(visible.diary, { title: '云端版本' })
+  assert.deepEqual(visible.diary, { title: 'local-new' })
   assert.deepEqual(visible.checkin, { mood: 5 })
-  assert.deepEqual(visible.highlights, { wins: ['本地独有'], improves: [] })
   assert.equal(result.conflicts.length, 1)
-  assert.deepEqual(local.exportBundle('u1').conflicts[0].local, { title: '本地版本' })
-  assert.deepEqual(local.exportBundle('u1').conflicts[0].remote, { title: '云端版本' })
-  assert.equal('diary' in local.readOutbox('u1')['2026-07-12'], false)
+  assert.deepEqual(local.exportBundle('u1').conflicts[0].local, { title: 'local-new' })
+  assert.deepEqual(local.exportBundle('u1').conflicts[0].remote, { title: 'cloud-old' })
+  assert.deepEqual(local.readOutbox('u1')['2026-07-12'].diary, { title: 'local-new' })
+})
+
+test('refreshes a non-pending local cache from the cloud without a conflict', () => {
+  const local = createLocalStore(new MemoryStorage())
+  local.saveFields('u1', '2026-07-12', {
+    diary: { title: 'previous-cache' }
+  }, { queue: false })
+
+  const result = local.mergeRemote('u1', {
+    '2026-07-12': { diary: { title: 'cloud-current' } }
+  })
+
+  assert.deepEqual(local.readEntries('u1')['2026-07-12'].diary, {
+    title: 'cloud-current'
+  })
+  assert.deepEqual(result.conflicts, [])
 })
 
 test('acknowledges only fields confirmed by the cloud', () => {

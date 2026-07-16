@@ -42,6 +42,38 @@ test('acknowledges an outbox field only after confirmed upload', async () => {
   assert.equal(Object.keys(local.readOutbox('u1')['2026-07-13']).length, 1)
 })
 
+test('uploads a pending local edit after archiving a stale cloud version', async () => {
+  const local = createLocalStore(new MemoryStorage())
+  local.saveFields('u1', '2026-07-15', {
+    diary: { title: 'local-new', content: 'kept after refresh' }
+  })
+  const uploads = []
+  const cloud = {
+    fetchAll: async () => ({
+      kind: 'success',
+      data: { '2026-07-15': { diary: { title: 'cloud-old', content: '' } } }
+    }),
+    upsertFields: async (_userId, date, fields) => {
+      uploads.push({ date, fields })
+      return { kind: 'success' }
+    }
+  }
+
+  const result = await syncWithAdapters('u1', local, cloud)
+
+  assert.equal(result.kind, 'synced')
+  assert.equal(result.conflicts.length, 1)
+  assert.deepEqual(uploads, [{
+    date: '2026-07-15',
+    fields: { diary: { title: 'local-new', content: 'kept after refresh' } }
+  }])
+  assert.deepEqual(local.readEntries('u1')['2026-07-15'].diary, {
+    title: 'local-new',
+    content: 'kept after refresh'
+  })
+  assert.deepEqual(local.readOutbox('u1'), {})
+})
+
 test('switching users and logout changes the visible local namespace', async () => {
   const local = createLocalStore(new MemoryStorage())
   local.saveFields('u1', '2026-07-13', { diary: { title: '用户一' } })
