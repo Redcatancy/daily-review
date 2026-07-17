@@ -1,24 +1,34 @@
 // 日记模块 — 日记本风格：日期大标题、横线背景、书写仪式感
 import { getEntry, saveEntry } from './store.js'
-import { debounce, showStatus, parseDate, displayDate } from './utils.js'
+import { getCurrentUser } from './auth.js'
+import { createCapturedDebounce, createRenderGuard } from './editor-state.js'
+import { showSaveResult, parseDate } from './utils.js'
 
-const debouncedSave = debounce(saveDiary, 1000)
+const renderGuard = createRenderGuard()
+let pendingDiary = null
+
+export async function flushPendingDiarySave() {
+  return pendingDiary?.flush()
+}
 
 export function renderDiary(container, dateStr) {
+  void flushPendingDiarySave()
+
   const date = parseDate(dateStr)
   const weekDays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六']
-  const year = date.getFullYear()
-  const month = date.getMonth() + 1
-  const day = date.getDate()
-  const weekday = weekDays[date.getDay()]
+  const token = renderGuard.begin({
+    userId: getCurrentUser()?.id ?? null,
+    date: dateStr
+  })
+  const state = { edited: false }
 
   container.innerHTML = `
     <div class="notebook">
       <div class="notebook-header">
-        <div class="notebook-date-big">${day}</div>
+        <div class="notebook-date-big">${date.getDate()}</div>
         <div class="notebook-date-info">
-          <div class="notebook-month">${year}年${month}月</div>
-          <div class="notebook-weekday">${weekday}</div>
+          <div class="notebook-month">${date.getFullYear()}年${date.getMonth() + 1}月</div>
+          <div class="notebook-weekday">${weekDays[date.getDay()]}</div>
         </div>
         <div class="notebook-weather" id="notebook-weather"></div>
       </div>
@@ -33,33 +43,33 @@ export function renderDiary(container, dateStr) {
     </div>
   `
 
-  document.getElementById('diary-title').addEventListener('input', () => debouncedSave(dateStr))
-  document.getElementById('diary-content').addEventListener('input', () => debouncedSave(dateStr))
-  loadDiary(dateStr)
-}
+  const titleInput = container.querySelector('#diary-title')
+  const contentInput = container.querySelector('#diary-content')
+  pendingDiary = createCapturedDebounce(saveCapturedDiary, 1000)
 
-function loadDiary(dateStr) {
-  const entry = getEntry(dateStr)
-  const data = entry ? entry.diary : null
-  const titleInput = document.getElementById('diary-title')
-  const contentInput = document.getElementById('diary-content')
-
-  if (data) {
-    titleInput.value = data.title || ''
-    contentInput.value = data.content || ''
-  } else {
-    titleInput.value = ''
-    contentInput.value = ''
+  function scheduleSave() {
+    state.edited = true
+    pendingDiary.schedule({
+      date: dateStr,
+      title: titleInput.value,
+      content: contentInput.value
+    })
   }
+
+  titleInput.addEventListener('input', scheduleSave)
+  contentInput.addEventListener('input', scheduleSave)
+
+  void getEntry(dateStr).then(entry => {
+    if (!renderGuard.isCurrent(token) || !container.isConnected || state.edited) return
+    titleInput.value = entry?.diary?.title || ''
+    contentInput.value = entry?.diary?.content || ''
+  })
 }
 
-function saveDiary(dateStr) {
-  const title = document.getElementById('diary-title').value
-  const content = document.getElementById('diary-content').value
-  if (!title.trim() && !content.trim()) return
-
-  saveEntry(dateStr, {
-    diary: { title: title.trim(), content: content.trim() }
-  })
-  showStatus('日记已自动保存')
+async function saveCapturedDiary({ date, title, content }) {
+  const diary = title.trim() || content.trim()
+    ? { title: title.trim(), content: content.trim() }
+    : null
+  const result = await saveEntry(date, { diary })
+  return showSaveResult(result)
 }

@@ -1,4 +1,6 @@
 // 每日语录模块 — 通过一言API获取，按日缓存
+import { icon } from './icons.js'
+
 const QUOTE_CACHE_KEY = 'daily-quote-cache'
 
 function readCache() {
@@ -38,7 +40,7 @@ export function renderQuote(container, quote) {
   if (!quote) {
     container.innerHTML = `
       <div class="daily-quote">
-        <div class="quote-icon">💬</div>
+        <div class="quote-icon">${icon('message-circle', 'ui-icon ui-icon-section')}</div>
         <div class="quote-text quote-failed">语录加载中...</div>
       </div>
     `
@@ -48,7 +50,7 @@ export function renderQuote(container, quote) {
   const source = [quote.fromWho, quote.from].filter(Boolean).join(' · ')
   container.innerHTML = `
     <div class="daily-quote">
-      <div class="quote-icon">✨</div>
+      <div class="quote-icon">${icon('sparkles', 'ui-icon ui-icon-section')}</div>
       <div class="quote-body">
         <div class="quote-text">${escapeHtml(quote.text)}</div>
         ${source ? `<div class="quote-source">—— ${escapeHtml(source)}</div>` : ''}

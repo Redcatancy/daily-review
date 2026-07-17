@@ -7,8 +7,12 @@ function escapeHtml(str) {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
-function buildPreview(dateStr) {
-  const entry = getEntry(dateStr)
+export function getCalendarPreviewText(entry) {
+  return entry?.diary?.title?.trim() || ''
+}
+
+async function buildPreview(dateStr) {
+  const entry = await getEntry(dateStr)
   if (!entry) return { moodColor: '', previewText: '' }
 
   let moodColor = ''
@@ -24,22 +28,12 @@ function buildPreview(dateStr) {
     }
   }
 
-  let previewText = ''
-  if (entry.diary && entry.diary.title) {
-    previewText = entry.diary.title
-  } else if (entry.highlights) {
-    const win = (entry.highlights.wins || []).find(w => w.trim())
-    if (win) previewText = win
-    else {
-      const imp = (entry.highlights.improves || []).find(w => w.trim())
-      if (imp) previewText = imp
-    }
-  }
+  const previewText = getCalendarPreviewText(entry)
 
   return { moodColor, previewText }
 }
 
-export function renderCalendar(container, currentDateStr, onDateClick) {
+export async function renderCalendar(container, currentDateStr, onDateClick) {
   const today = new Date()
   const current = parseDate(currentDateStr)
   const year = current.getFullYear()
@@ -78,7 +72,7 @@ export function renderCalendar(container, currentDateStr, onDateClick) {
     if (isToday) classes.push('today')
     if (isSelected) classes.push('selected')
 
-    const { moodColor, previewText } = buildPreview(dateStr)
+    const { moodColor, previewText } = await buildPreview(dateStr)
     if (moodColor || previewText) classes.push('has-data')
 
     const moodHtml = moodColor ? `<span class="day-mood" style="background:${moodColor}"></span>` : ''

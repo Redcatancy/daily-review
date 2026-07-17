@@ -1,57 +1,124 @@
-// 本地存储模块 — 数据存在浏览器 localStorage 中
-// 数据格式：localStorage['daily-review'] = { "2026-06-06": { checkin, highlights, diary }, ... }
+import { supabase } from './supabase.js'
+import { createLocalStore } from './local-store.js'
+import { createCloudStore } from './cloud-store.js'
 
-const STORAGE_KEY = 'daily-review'
+export async function syncWithAdapters(userId, local, cloud) {
+  const remote = await cloud.fetchAll(userId)
+  if (remote.kind === 'failure') return { kind: 'pending', error: remote.error }
 
-// 读取所有数据
-function readAll() {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}
-  } catch {
-    return {}
-  }
-}
+  const merged = local.mergeRemote(userId, remote.data)
+  if (merged.kind === 'local-failure') return merged
 
-// 写入所有数据
-function writeAll(data) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
-}
-
-// 获取某天的数据
-export function getEntry(dateStr) {
-  const all = readAll()
-  return all[dateStr] || null
-}
-
-// 保存某天的部分数据（自动合并）
-export function saveEntry(dateStr, fields) {
-  const all = readAll()
-  if (!all[dateStr]) all[dateStr] = {}
-  Object.assign(all[dateStr], fields)
-  writeAll(all)
-}
-
-// 查询某月有数据的日期
-export function getMonthDates(year, month) {
-  const prefix = `${year}-${String(month + 1).padStart(2, '0')}`
-  const all = readAll()
-  return Object.keys(all).filter(d => d.startsWith(prefix))
-}
-
-// 获取日期范围内的所有数据（返回 [{date, ...data}] 数组，按日期排序）
-export function getRange(startDate, endDate) {
-  const all = readAll()
-  const result = []
-  const keys = Object.keys(all).sort()
-  for (const key of keys) {
-    if (key >= startDate && key <= endDate) {
-      result.push({ date: key, ...all[key] })
+  const outbox = local.readOutbox(userId)
+  for (const [date, fields] of Object.entries(outbox)) {
+    for (const [field, value] of Object.entries(fields)) {
+      const uploaded = await cloud.upsertFields(userId, date, { [field]: value })
+      if (uploaded.kind === 'failure') {
+        return {
+          kind: 'pending',
+          error: uploaded.error,
+          conflicts: merged.conflicts
+        }
+      }
+      const acknowledged = local.ackUploaded(userId, date, { [field]: value })
+      if (acknowledged.kind !== 'ok') return acknowledged
     }
   }
-  return result
+  return { kind: 'synced', conflicts: merged.conflicts }
 }
 
-// 获取所有有数据的日期
-export function getAllDates() {
-  return Object.keys(readAll()).sort()
+export function createStoreFacade(localStore, cloudStore) {
+  let activeUserId = null
+  const syncChains = new Map()
+
+  function setActiveUser(user) {
+    activeUserId = user?.id ?? null
+  }
+
+  function enqueueUserSync(userId) {
+    const previous = syncChains.get(userId) || Promise.resolve()
+    const next = previous
+      .catch(() => undefined)
+      .then(() => syncWithAdapters(userId, localStore, cloudStore))
+    syncChains.set(userId, next)
+    return next
+  }
+
+  async function syncOnLogin() {
+    const userId = activeUserId
+    if (!userId) return { kind: 'guest' }
+
+    const migrated = localStore.migrateLegacy(userId)
+    if (migrated.kind === 'local-failure' || migrated.kind === 'invalid-legacy') {
+      return migrated
+    }
+    return enqueueUserSync(userId)
+  }
+
+  async function getEntry(date) {
+    return localStore.readEntries(activeUserId)[date] || null
+  }
+
+  async function saveEntry(date, fields) {
+    const userId = activeUserId
+    const localResult = localStore.saveFields(userId, date, fields)
+    if (localResult.kind === 'local-failure' || !userId) return localResult
+
+    return enqueueUserSync(userId)
+      .then(result => result.kind === 'synced'
+        ? { kind: 'synced', conflicts: result.conflicts }
+        : { kind: 'local-saved-pending', error: result.error })
+      .catch(error => ({ kind: 'local-saved-pending', error }))
+  }
+
+  async function getRange(startDate, endDate) {
+    return Object.entries(localStore.readEntries(activeUserId))
+      .filter(([date]) => date >= startDate && date <= endDate)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([date, entry]) => ({ date, ...entry }))
+  }
+
+  async function getMonthDates(year, month) {
+    const prefix = `${year}-${String(month + 1).padStart(2, '0')}`
+    return Object.keys(localStore.readEntries(activeUserId))
+      .filter(date => date.startsWith(prefix))
+  }
+
+  async function getAllDates() {
+    return Object.keys(localStore.readEntries(activeUserId)).sort()
+  }
+
+  function exportCurrentBackup() {
+    return localStore.exportBundle(activeUserId)
+  }
+
+  return {
+    setActiveUser,
+    syncOnLogin,
+    getEntry,
+    saveEntry,
+    getRange,
+    getMonthDates,
+    getAllDates,
+    exportCurrentBackup
+  }
 }
+
+let defaultFacade
+
+function appStore() {
+  defaultFacade ||= createStoreFacade(
+    createLocalStore(globalThis.localStorage),
+    createCloudStore(supabase)
+  )
+  return defaultFacade
+}
+
+export const setActiveUser = user => appStore().setActiveUser(user)
+export const syncOnLogin = () => appStore().syncOnLogin()
+export const getEntry = date => appStore().getEntry(date)
+export const saveEntry = (date, fields) => appStore().saveEntry(date, fields)
+export const getRange = (start, end) => appStore().getRange(start, end)
+export const getMonthDates = (year, month) => appStore().getMonthDates(year, month)
+export const getAllDates = () => appStore().getAllDates()
+export const exportCurrentBackup = () => appStore().exportCurrentBackup()

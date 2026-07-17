@@ -39,3 +39,23 @@ export function showStatus(message, duration = 2000) {
   bar.classList.add('visible')
   setTimeout(() => bar.classList.remove('visible'), duration)
 }
+
+export function saveResultMessage(result) {
+  if (result?.kind === 'synced') {
+    return result.conflicts?.length
+      ? '发现数据冲突，双方版本已保留'
+      : '已同步'
+  }
+  if (result?.kind === 'local-saved' && !result.pending) {
+    return '已保存到本地'
+  }
+  if (result?.kind === 'local-saved-pending' || result?.kind === 'pending') {
+    return '已保存到本地，等待网络同步'
+  }
+  return '本地保存失败，请立即导出备份'
+}
+
+export function showSaveResult(result) {
+  showStatus(saveResultMessage(result))
+  return result
+}
