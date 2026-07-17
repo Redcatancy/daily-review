@@ -20,7 +20,7 @@ export async function syncWithAdapters(userId, local, cloud) {
           conflicts: merged.conflicts
         }
       }
-      const acknowledged = local.ackOutbox(userId, date, [field])
+      const acknowledged = local.ackUploaded(userId, date, { [field]: value })
       if (acknowledged.kind !== 'ok') return acknowledged
     }
   }

@@ -9,6 +9,7 @@ const entriesKey = userId => userId
 const outboxKey = userId => `daily-review:user:${userId}:outbox`
 const conflictsKey = userId => `daily-review:user:${userId}:conflicts`
 const migrationKey = userId => `daily-review:user:${userId}:migration`
+const remoteSnapshotKey = userId => `daily-review:user:${userId}:remote-snapshot`
 
 function canonical(value) {
   if (Array.isArray(value)) return value.map(canonical)
@@ -56,6 +57,10 @@ export function createLocalStore(storage, { now = () => new Date().toISOString()
 
   function readOutbox(userId) {
     return userId ? readJson(outboxKey(userId), {}) : {}
+  }
+
+  function readRemoteSnapshot(userId) {
+    return userId ? readJson(remoteSnapshotKey(userId), {}) : {}
   }
 
   function saveFields(userId, date, fields, { queue = true } = {}) {
@@ -133,37 +138,43 @@ export function createLocalStore(storage, { now = () => new Date().toISOString()
   function mergeRemote(userId, remoteEntries) {
     const entries = readEntries(userId)
     const outbox = readOutbox(userId)
+    const remoteSnapshot = readRemoteSnapshot(userId)
     const conflicts = readJson(conflictsKey(userId), [])
     const newConflicts = []
 
     for (const [date, remoteEntry] of Object.entries(remoteEntries)) {
       entries[date] ||= {}
       for (const field of FIELDS) {
-        const localValue = entries[date][field]
         const remoteValue = remoteEntry[field]
         const pendingField = Object.hasOwn(outbox[date] || {}, field)
-        const localPresent = hasValue(localValue) || pendingField
 
         if (!hasValue(remoteValue)) continue
-        if (!localPresent) {
-          entries[date][field] = structuredClone(remoteValue)
-          continue
-        }
-        if (equalValue(localValue, remoteValue)) continue
+        remoteSnapshot[date] ||= {}
 
         if (!pendingField) {
           entries[date][field] = structuredClone(remoteValue)
+          remoteSnapshot[date][field] = structuredClone(remoteValue)
           continue
         }
 
         const pendingValue = outbox[date][field]
+        if (equalValue(pendingValue, remoteValue)) {
+          entries[date][field] = structuredClone(pendingValue)
+          remoteSnapshot[date][field] = structuredClone(remoteValue)
+          continue
+        }
+
+        const baselinePresent = Object.hasOwn(remoteSnapshot[date], field)
+        const remoteDiverged = baselinePresent &&
+          !equalValue(remoteSnapshot[date][field], remoteValue)
 
         const conflict = {
           date,
           field,
           local: structuredClone(pendingValue),
           remote: structuredClone(remoteValue),
-          detectedAt: now()
+          detectedAt: now(),
+          classification: remoteDiverged ? 'remote-diverged' : 'baseline-missing'
         }
         const alreadyArchived = conflicts.some(item =>
           item.date === date &&
@@ -171,12 +182,13 @@ export function createLocalStore(storage, { now = () => new Date().toISOString()
           equalValue(item.local, conflict.local) &&
           equalValue(item.remote, conflict.remote)
         )
-        if (!alreadyArchived) {
+        if ((remoteDiverged || !baselinePresent) && !alreadyArchived) {
           conflicts.push(conflict)
-          newConflicts.push(conflict)
+          if (remoteDiverged) newConflicts.push(conflict)
         }
 
         entries[date][field] = structuredClone(pendingValue)
+        remoteSnapshot[date][field] = structuredClone(remoteValue)
       }
     }
 
@@ -186,6 +198,8 @@ export function createLocalStore(storage, { now = () => new Date().toISOString()
 
     const conflictWrite = verifiedWrite(conflictsKey(userId), conflicts)
     if (conflictWrite.kind !== 'ok') return conflictWrite
+    const snapshotWrite = verifiedWrite(remoteSnapshotKey(userId), remoteSnapshot)
+    if (snapshotWrite.kind !== 'ok') return snapshotWrite
     const entriesWrite = verifiedWrite(entriesKey(userId), entries)
     if (entriesWrite.kind !== 'ok') return entriesWrite
     const outboxWrite = verifiedWrite(outboxKey(userId), outbox)
@@ -201,6 +215,25 @@ export function createLocalStore(storage, { now = () => new Date().toISOString()
     return verifiedWrite(outboxKey(userId), outbox)
   }
 
+  function ackUploaded(userId, date, uploadedFields) {
+    const remoteSnapshot = readRemoteSnapshot(userId)
+    remoteSnapshot[date] ||= {}
+    for (const [field, value] of Object.entries(uploadedFields)) {
+      remoteSnapshot[date][field] = structuredClone(value)
+    }
+    const snapshotWrite = verifiedWrite(remoteSnapshotKey(userId), remoteSnapshot)
+    if (snapshotWrite.kind !== 'ok') return snapshotWrite
+
+    const outbox = readOutbox(userId)
+    if (outbox[date]) {
+      for (const [field, value] of Object.entries(uploadedFields)) {
+        if (equalValue(outbox[date][field], value)) delete outbox[date][field]
+      }
+      if (Object.keys(outbox[date]).length === 0) delete outbox[date]
+    }
+    return verifiedWrite(outboxKey(userId), outbox)
+  }
+
   function exportBundle(userId) {
     return {
       version: 1,
@@ -209,6 +242,7 @@ export function createLocalStore(storage, { now = () => new Date().toISOString()
       entries: readEntries(userId),
       outbox: readOutbox(userId),
       conflicts: userId ? readJson(conflictsKey(userId), []) : [],
+      remoteSnapshot: readRemoteSnapshot(userId),
       migration: userId ? readJson(migrationKey(userId), null) : null,
       legacyBackup: readJson(LEGACY_BACKUP_KEY, null),
       legacyClaim: readJson(LEGACY_CLAIM_KEY, null)
@@ -218,10 +252,12 @@ export function createLocalStore(storage, { now = () => new Date().toISOString()
   return {
     readEntries,
     readOutbox,
+    readRemoteSnapshot,
     saveFields,
     migrateLegacy,
     mergeRemote,
     ackOutbox,
+    ackUploaded,
     exportBundle,
     verifiedWrite
   }

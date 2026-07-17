@@ -42,7 +42,7 @@ test('acknowledges an outbox field only after confirmed upload', async () => {
   assert.equal(Object.keys(local.readOutbox('u1')['2026-07-13']).length, 1)
 })
 
-test('uploads a pending local edit after archiving a stale cloud version', async () => {
+test('uploads a pending local edit without reporting normal cloud lag', async () => {
   const local = createLocalStore(new MemoryStorage())
   local.saveFields('u1', '2026-07-15', {
     diary: { title: 'local-new', content: 'kept after refresh' }
@@ -62,7 +62,7 @@ test('uploads a pending local edit after archiving a stale cloud version', async
   const result = await syncWithAdapters('u1', local, cloud)
 
   assert.equal(result.kind, 'synced')
-  assert.equal(result.conflicts.length, 1)
+  assert.deepEqual(result.conflicts, [])
   assert.deepEqual(uploads, [{
     date: '2026-07-15',
     fields: { diary: { title: 'local-new', content: 'kept after refresh' } }
@@ -71,6 +71,48 @@ test('uploads a pending local edit after archiving a stale cloud version', async
     title: 'local-new',
     content: 'kept after refresh'
   })
+  assert.deepEqual(local.readOutbox('u1'), {})
+})
+
+test('a completed older upload does not discard an edit queued during the request', async () => {
+  const local = createLocalStore(new MemoryStorage())
+  local.mergeRemote('u1', {
+    '2026-07-15': { diary: { title: 'cloud-base' } }
+  })
+  local.saveFields('u1', '2026-07-15', {
+    diary: { title: 'first edit' }
+  })
+  const uploads = []
+  let remoteDiary = { title: 'cloud-base' }
+  const cloud = {
+    fetchAll: async () => ({
+      kind: 'success',
+      data: { '2026-07-15': { diary: structuredClone(remoteDiary) } }
+    }),
+    upsertFields: async (_userId, _date, fields) => {
+      uploads.push(structuredClone(fields.diary))
+      if (uploads.length === 1) {
+        local.saveFields('u1', '2026-07-15', {
+          diary: { title: 'newer edit' }
+        })
+      }
+      remoteDiary = structuredClone(fields.diary)
+      return { kind: 'success' }
+    }
+  }
+
+  await syncWithAdapters('u1', local, cloud)
+
+  assert.deepEqual(local.readOutbox('u1')['2026-07-15'].diary, {
+    title: 'newer edit'
+  })
+
+  await syncWithAdapters('u1', local, cloud)
+
+  assert.deepEqual(uploads, [
+    { title: 'first edit' },
+    { title: 'newer edit' }
+  ])
   assert.deepEqual(local.readOutbox('u1'), {})
 })
 
